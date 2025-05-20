@@ -319,16 +319,53 @@ def main():
         seed=42,
     )
 
-    # Create SFT trainer
-    trainer = SFTTrainer(
-        model=model,
-        train_dataset=dataset,
-        peft_config=peft_config,
-        dataset_text_field="text",
-        max_seq_length=args.max_seq_length,
-        tokenizer=tokenizer,
-        args=training_args,
-    )
+    # Try different ways to initialize the SFTTrainer based on version compatibility
+    try:
+        # Version 1: Minimal parameters
+        trainer = SFTTrainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+        )
+    except TypeError as e:
+        print(f"First initialization approach failed: {e}")
+        try:
+            # Version 2: With peft_config but no tokenizer
+            trainer = SFTTrainer(
+                model=model,
+                train_dataset=dataset,
+                args=training_args,
+                peft_config=peft_config,
+            )
+        except TypeError as e:
+            print(f"Second initialization approach failed: {e}")
+            try:
+                # Version 3: With peft_config and formatting_func
+                trainer = SFTTrainer(
+                    model=model,
+                    train_dataset=dataset,
+                    args=training_args,
+                    peft_config=peft_config,
+                    formatting_func=lambda example: example["text"] if "text" in example else example,
+                )
+            except TypeError as e:
+                print(f"Third initialization approach failed: {e}")
+                # Version 4: Last resort, check installed trl version
+                import pkg_resources
+                trl_version = pkg_resources.get_distribution("trl").version
+                print(f"Installed TRL version: {trl_version}")
+
+                if trl_version.startswith("0.3"):
+                    # For older versions
+                    from trl import SFTTrainer as OldSFTTrainer
+                    trainer = OldSFTTrainer(
+                        model=model,
+                        train_dataset=dataset,
+                        args=training_args,
+                    )
+                else:
+                    raise ValueError(
+                        f"Could not initialize SFTTrainer with TRL version {trl_version}. Please check compatibility.")
 
     # Start training
     print("Starting QLoRA fine-tuning with single epoch...")
