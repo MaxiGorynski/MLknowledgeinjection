@@ -1,2 +1,3 @@
 ssh_key_fixed
 venv
+results/agi-injection-direct/final_model/adapter_model.safetensors
